@@ -2,169 +2,74 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <title>disAIster</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>disAIster - Global Response System</title>
 
-  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Heatmap Plugin -->
+  <!-- HEATMAP -->
   <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
-  <!-- Custom CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
 
-<body class="flex flex-col h-screen">
+<body class="flex flex-col h-screen bg-black text-white">
 
-<!-- Toast -->
-<div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-20 opacity-0 transition-all duration-300 px-4 py-2 rounded text-sm z-[9999] bg-[var(--alert-critical)] text-white">
-  <span id="toastMessage"></span>
-</div>
-
-<!-- Header -->
-<header class="header px-4 py-3 relative z-50">
-  <div class="flex items-center justify-between">
-
-    <!-- Logo -->
-    <div class="flex items-center gap-3">
-      <img src="logo.png" alt="Logo" class="h-10 cursor-pointer" onclick="zoomToPrimary()">
-      <img src="textlogo.png" alt="disAIster" class="h-8">
-    </div>
-
-    <!-- Search -->
-    <div class="search-container flex-1 max-w-md mx-4">
-      <input type="text" id="locationSearch"
-        class="search-input w-full px-4 py-2 rounded-lg text-sm"
-        placeholder="Search location...">
-    </div>
-
-    <!-- Status -->
-    <div class="flex items-center gap-4">
-      <div class="flex items-center gap-2">
-        <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-        <span class="text-sm mono">SYSTEM ONLINE</span>
-      </div>
-      <span class="text-sm mono" id="currentTime">--:--:--</span>
-    </div>
-  </div>
+<header class="flex justify-between items-center px-6 py-3 bg-[#0b1220]">
+  <h1 class="text-xl font-bold">disAIster</h1>
+  <input id="locationSearch" type="text" placeholder="Search location..."
+         class="px-3 py-2 rounded bg-[#1a2336] text-sm w-72">
 </header>
 
-<!-- Main -->
-<main class="flex-1 flex overflow-hidden relative">
+<main class="flex flex-1">
 
-<!-- LEFT PANEL -->
-<aside class="sidebar h-full p-3 flex flex-col gap-3" style="width:320px;">
-
-  <!-- Primary Zone -->
-  <div class="panel flex-1 flex flex-col">
-    <div class="panel-header flex justify-between">
-      <span class="panel-title">Primary Incident Zone</span>
-      <span class="location-badge cursor-pointer" onclick="zoomToPrimary()">Live</span>
+  <!-- LEFT PANEL -->
+  <div class="w-64 bg-[#0f172a] p-4 flex flex-col gap-4">
+    <div>
+      <div class="text-sm opacity-70">Incidents</div>
+      <div id="primaryIncidentCount" class="text-2xl font-bold">0</div>
     </div>
 
-    <div class="p-3 grid grid-cols-2 gap-2 border-b border-[var(--border-color)]">
-      <div class="stat-card">
-        <div class="text-xs text-gray-400">Incidents</div>
-        <div class="stat-value mono text-red-500" id="primaryIncidentCount">0</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="text-xs text-gray-400">Risk Level</div>
-        <div class="stat-value-sm mono mt-1" id="primaryRisk">LOW</div>
-      </div>
+    <div>
+      <div class="text-sm opacity-70">Risk Level</div>
+      <div id="primaryRisk" class="text-lg">LOW</div>
     </div>
 
-    <div class="flex-1 overflow-y-auto p-3" id="primaryAlertStream"></div>
-  </div>
-
-  <!-- Remote Monitoring -->
-  <div class="panel flex-1 flex flex-col">
-    <div class="panel-header flex justify-between">
-      <span class="panel-title">Remote Monitoring</span>
-      <span class="text-xs" id="remoteCount">0 Locations</span>
-    </div>
-    <div class="flex-1 overflow-y-auto p-3" id="remoteLocationsContainer">
-      <div class="text-center text-xs py-4 text-gray-400">
-        Search a location to add monitoring
-      </div>
+    <div>
+      <div class="text-sm opacity-70">Remote Monitoring</div>
+      <div id="remoteLocationsContainer" class="text-xs mt-2 space-y-1"></div>
     </div>
   </div>
 
-</aside>
+  <!-- MAP -->
+  <div id="map" class="flex-1"></div>
 
-<!-- MAP -->
-<div class="flex-1 relative">
-  <div id="map" class="absolute inset-0"></div>
+  <!-- RIGHT PANEL -->
+  <div class="w-72 bg-[#0f172a] p-4 flex flex-col gap-4">
 
-  <!-- Filters -->
-  <div class="floating-filters z-[1000]">
-    <button class="filter-btn active" data-filter="all">All</button>
-    <button class="filter-btn" data-filter="flood">Flood</button>
-    <button class="filter-btn" data-filter="fire">Fire</button>
-    <button class="filter-btn" data-filter="earthquake">Quake</button>
-    <button class="filter-btn" data-filter="cyclone">Cyclone</button>
-  </div>
+    <button onclick="triggerSOS()"
+            class="bg-red-600 py-2 rounded font-bold">
+      SOS
+    </button>
 
-  <!-- Layer Switch -->
-  <div class="absolute bottom-24 right-3 z-[1000] flex flex-col gap-2">
-    <button class="layer-btn active" onclick="switchLayer('dark')">🌙</button>
-    <button class="layer-btn" onclick="switchLayer('satellite')">🛰️</button>
-  </div>
-</div>
-
-<!-- RIGHT PANEL -->
-<aside class="sidebar h-full p-3 flex flex-col gap-3" style="width:320px;">
-
-  <!-- SOS -->
-  <div class="panel p-4 flex flex-col items-center text-center border border-red-500">
-    <div class="w-16 h-16 rounded-full border-4 border-red-500 flex items-center justify-center mb-3 cursor-pointer"
-      id="sosBtn" onclick="triggerSOS()">
-      <span class="text-2xl font-bold text-red-500">SOS</span>
-    </div>
-    <div class="text-xs">EMERGENCY BEACON</div>
-    <div class="text-sm font-bold mt-1" id="sosStatus">TAP TO ACTIVATE</div>
-  </div>
-
-  <!-- AI -->
-  <div class="panel flex flex-col flex-1">
-    <div class="panel-header">
-      <span class="panel-title">AI Analysis</span>
+    <div>
+      <input id="aiInput"
+             placeholder="Report incident..."
+             class="w-full px-3 py-2 rounded bg-[#1a2336] text-sm"
+             onkeydown="if(event.key==='Enter')sendAIQuery()">
     </div>
 
-    <div class="flex-1 overflow-y-auto p-3 space-y-3" id="aiChatContainer"></div>
-
-    <div class="p-2 border-t border-[var(--border-color)]">
-      <input type="text"
-        id="aiInput"
-        class="search-input w-full py-2 text-sm rounded-lg"
-        placeholder="Report incident..."
-        onkeydown="if(event.key==='Enter')sendAIQuery()">
+    <div class="grid grid-cols-2 gap-2">
+      <button onclick="triggerAction('drone')" class="bg-blue-600 py-2 rounded text-sm">Deploy Drone</button>
+      <button onclick="triggerAction('aid')" class="bg-green-600 py-2 rounded text-sm">Request Aid</button>
+      <button onclick="triggerAction('evacuate')" class="bg-yellow-600 py-2 rounded text-sm">Evacuate</button>
+      <button onclick="triggerAction('lockdown')" class="bg-purple-600 py-2 rounded text-sm">Lockdown</button>
     </div>
+
   </div>
-
-  <!-- Quick Actions -->
-  <div class="panel p-3">
-    <div class="panel-header pb-2">
-      <span class="panel-title">Quick Actions</span>
-    </div>
-
-    <div class="grid grid-cols-2 gap-2 mt-2">
-      <button class="action-btn" onclick="triggerAction('drone')">Deploy Drone</button>
-      <button class="action-btn" onclick="triggerAction('aid')">Request Aid</button>
-      <button class="action-btn" onclick="triggerAction('evacuate')">Evacuate</button>
-      <button class="action-btn" onclick="triggerAction('lockdown')">Lockdown</button>
-    </div>
-  </div>
-
-</aside>
 
 </main>
 
