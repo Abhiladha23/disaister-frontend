@@ -4,8 +4,12 @@ let map;
 let markersLayer;
 let heatLayer;
 let currentLayerName = "dark";
-
 let layers = {};
+
+let userLocation = {
+  lat: null,
+  lng: null
+};
 
 let state = {
   activeFilter: "all"
@@ -17,21 +21,44 @@ document.addEventListener("DOMContentLoaded", () => {
   updateTime();
   setInterval(updateTime, 1000);
 
-  fetchIncidents();
-  loadSatelliteFires();
-  checkUserDanger();
-
-  setInterval(fetchIncidents, 15000);
-  setInterval(checkUserDanger, 20000);
+  getLiveLocation();
 });
+
+function getLiveLocation() {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(position => {
+    userLocation.lat = position.coords.latitude;
+    userLocation.lng = position.coords.longitude;
+
+    map.setView([userLocation.lat, userLocation.lng], 10);
+
+    L.marker([userLocation.lat, userLocation.lng])
+      .addTo(map)
+      .bindPopup("You are here")
+      .openPopup();
+
+    fetchIncidents();
+    loadSatelliteFires();
+    checkUserDanger();
+
+    setInterval(fetchIncidents, 15000);
+    setInterval(checkUserDanger, 20000);
+
+  }, () => {
+    alert("Location access denied");
+  });
+}
 
 function initMap() {
   map = L.map("map", { center: [13.0827, 80.2707], zoom: 6 });
 
   layers = {
     dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"),
-    satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"),
-    rain: L.tileLayer("https://tilecache.rainviewer.com/v2/radar/nowcast/{z}/{x}/{y}/2/1_1.png")
+    satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}")
   };
 
   layers.dark.addTo(map);
@@ -42,6 +69,12 @@ function switchLayer(layer) {
   map.removeLayer(layers[currentLayerName]);
   layers[layer].addTo(map);
   currentLayerName = layer;
+}
+
+function zoomToPrimary() {
+  if (userLocation.lat && userLocation.lng) {
+    map.setView([userLocation.lat, userLocation.lng], 12);
+  }
 }
 
 function updateTime() {
@@ -63,7 +96,8 @@ function initUI() {
 async function sendAIQuery() {
   const input = document.getElementById("aiInput");
   const query = input.value.trim();
-  if (!query) return;
+  if (!query || !userLocation.lat) return;
+
   input.value = "";
 
   const response = await fetch(`${API_BASE_URL}/analyze`, {
@@ -71,8 +105,8 @@ async function sendAIQuery() {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       message: query,
-      lat: 13.0827,
-      lng: 80.2707
+      lat: userLocation.lat,
+      lng: userLocation.lng
     })
   });
 
@@ -84,6 +118,7 @@ async function sendAIQuery() {
 
   document.getElementById("aiChatContainer").innerHTML = `
     <div class="ai-response p-3 rounded-lg text-sm">
+      <div class="text-xs text-[var(--accent-primary)] font-bold mb-1">AI RESPONSE</div>
       Disaster: <b>${data.disaster_type}</b><br>
       Severity: <b>${data.severity}</b><br>
       Risk: <b>${data.risk_level}</b><br>
@@ -100,17 +135,19 @@ async function fetchIncidents() {
   const incidents = await res.json();
 
   markersLayer.clearLayers();
-
   let heatData = [];
 
   incidents.forEach(i => {
-    if (state.activeFilter !== "all" &&
-        i.disaster_type.toLowerCase() !== state.activeFilter) return;
 
-    const color = i.severity >= 8 ? "red"
-                 : i.severity >= 6 ? "orange"
-                 : i.severity >= 4 ? "yellow"
-                 : "green";
+    if (state.activeFilter !== "all" &&
+        i.disaster_type.toLowerCase() !== state.activeFilter)
+      return;
+
+    const color =
+      i.severity >= 8 ? "red" :
+      i.severity >= 6 ? "orange" :
+      i.severity >= 4 ? "yellow" :
+      "green";
 
     L.circleMarker([i.lat, i.lng], {
       radius: 8,
@@ -125,31 +162,59 @@ async function fetchIncidents() {
   heatLayer = L.heatLayer(heatData, { radius: 25 }).addTo(map);
 
   document.getElementById("primaryIncidentCount").innerText = incidents.length;
+
+  const riskEl = document.getElementById("primaryRisk");
+
+  if (incidents.length === 0) riskEl.innerText = "LOW";
+  else if (incidents.length < 3) riskEl.innerText = "MEDIUM";
+  else riskEl.innerText = "HIGH";
 }
 
 async function triggerSOS() {
+  if (!userLocation.lat) return;
+
   await fetch(`${API_BASE_URL}/sos`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       name: "Anonymous",
       contact: "N/A",
-      lat: 13.0827,
-      lng: 80.2707
+      lat: userLocation.lat,
+      lng: userLocation.lng
     })
   });
 
   document.getElementById("sosStatus").innerText = "BEACON ACTIVE";
+  showToast("SOS Signal Sent!");
+}
+
+async function triggerAction(type) {
+  if (!userLocation.lat) return;
+
+  const res = await fetch(`${API_BASE_URL}/action`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      type: type,
+      lat: userLocation.lat,
+      lng: userLocation.lng
+    })
+  });
+
+  const data = await res.json();
+  showToast(data.message);
 }
 
 async function checkUserDanger() {
+  if (!userLocation.lat) return;
+
   const res = await fetch(
-    `${API_BASE_URL}/is-user-in-danger?lat=13.0827&lng=80.2707`
+    `${API_BASE_URL}/is-user-in-danger?lat=${userLocation.lat}&lng=${userLocation.lng}`
   );
   const data = await res.json();
 
   if (data.in_danger) {
-    alert(`⚠ You are in ${data.severity} danger zone`);
+    showToast(`⚠ You are in ${data.severity} danger zone`);
   }
 }
 
@@ -171,4 +236,17 @@ async function loadSatelliteFires() {
       }).addTo(map);
     });
   } catch {}
+}
+
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  const msg = document.getElementById("toastMessage");
+
+  msg.innerText = message;
+  toast.classList.remove("opacity-0", "translate-y-20");
+  toast.classList.add("opacity-100");
+
+  setTimeout(() => {
+    toast.classList.add("opacity-0", "translate-y-20");
+  }, 3000);
 }
