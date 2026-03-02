@@ -3,6 +3,7 @@ const API_BASE_URL = "https://disaister-backend.onrender.com";
 let map;
 let markersLayer;
 let heatLayer;
+let userMarker;
 let userLat = null;
 let userLng = null;
 let monitored = [];
@@ -17,9 +18,11 @@ document.addEventListener("DOMContentLoaded", () => {
 function initMap() {
   map = L.map("map");
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+  const satellite = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+  );
+
+  satellite.addTo(map);
 
   markersLayer = L.layerGroup().addTo(map);
 
@@ -28,15 +31,15 @@ function initMap() {
       userLat = pos.coords.latitude;
       userLng = pos.coords.longitude;
 
-      map.setView([userLat, userLng], 10);
+      map.setView([userLat, userLng], 6);
 
-      L.marker([userLat, userLng])
+      userMarker = L.marker([userLat, userLng])
         .addTo(map)
         .bindPopup("You are here")
         .openPopup();
-
-      checkDanger();
     });
+  } else {
+    map.setView([20, 78], 5);
   }
 }
 
@@ -54,48 +57,57 @@ async function fetchIncidents() {
   let bounds = [];
 
   incidents.forEach(i => {
-
     const marker = L.circleMarker([i.lat, i.lng], {
-      radius: 8,
-      color: i.severity >= 7 ? "red" :
-             i.severity >= 5 ? "orange" : "yellow",
-      fillOpacity: 0.8
-    })
-    .bindPopup(`<b>${i.disaster_type}</b><br>${i.message}`);
+      radius: 10,
+      color: i.severity >= 7 ? "#ff3b3b"
+             : i.severity >= 5 ? "#ff9f1a"
+             : "#ffd60a",
+      fillOpacity: 0.9
+    }).bindPopup(
+      `<b>${i.disaster_type}</b><br>${i.message}<br>Severity: ${i.severity}`
+    );
 
     marker.addTo(markersLayer);
 
     // Strong heat intensity
-    heatData.push([i.lat, i.lng, 0.8]);
+    heatData.push([i.lat, i.lng, 1]);
 
     bounds.push([i.lat, i.lng]);
   });
 
-  // FORCE heatmap visible
   if (heatData.length > 0) {
     heatLayer = L.heatLayer(heatData, {
-      radius: 40,
-      blur: 25,
-      maxZoom: 17
+      radius: 50,
+      blur: 30,
+      maxZoom: 12,
+      gradient: {
+        0.2: "blue",
+        0.4: "lime",
+        0.6: "orange",
+        0.8: "red"
+      }
     }).addTo(map);
+
+    heatLayer.bringToFront();
+
+    map.fitBounds(bounds, { padding: [80, 80] });
   }
 
-  document.getElementById("primaryIncidentCount").innerText = incidents.length;
+  document.getElementById("primaryIncidentCount").innerText =
+    incidents.length;
 
   if (incidents.length > 0) {
     const max = Math.max(...incidents.map(i => i.severity));
     document.getElementById("primaryRisk").innerText =
-      max >= 7 ? "HIGH" :
-      max >= 5 ? "MEDIUM" : "LOW";
-
-    // 🔥 THIS FIXES YOUR LOCATION ISSUE
-    map.fitBounds(bounds, { padding: [50, 50] });
+      max >= 7 ? "HIGH"
+      : max >= 5 ? "MEDIUM"
+      : "LOW";
   }
 }
 
 async function sendAIQuery() {
   const input = document.getElementById("aiInput");
-  if (!input.value || !userLat) return;
+  if (!input.value || userLat === null) return;
 
   await fetch(`${API_BASE_URL}/analyze`, {
     method: "POST",
@@ -125,7 +137,7 @@ async function triggerSOS() {
     })
   });
 
-  alert("SOS Sent");
+  alert("SOS Activated");
 }
 
 async function triggerAction(type) {
@@ -142,20 +154,6 @@ async function triggerAction(type) {
   });
 
   alert(type.toUpperCase() + " initiated");
-}
-
-async function checkDanger() {
-  if (!userLat) return;
-
-  const res = await fetch(
-    `${API_BASE_URL}/is-user-in-danger?lat=${userLat}&lng=${userLng}`
-  );
-
-  const data = await res.json();
-
-  if (data.in_danger) {
-    alert("⚠ You are in danger zone");
-  }
 }
 
 function initSearch() {
@@ -177,15 +175,16 @@ function initSearch() {
         const lat = parseFloat(data[0].lat);
         const lng = parseFloat(data[0].lon);
 
-        map.setView([lat, lng], 10);
+        map.setView([lat, lng], 8);
 
         if (!monitored.includes(query)) {
           monitored.push(query);
 
-          const container = document.getElementById("remoteLocationsContainer");
+          const container =
+            document.getElementById("remoteLocationsContainer");
 
           const div = document.createElement("div");
-          div.innerText = "• " + query;
+          div.textContent = "• " + query;
           container.appendChild(div);
 
           L.marker([lat, lng])
