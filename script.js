@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://disaister-backend.onrender.com/";
+const API_BASE_URL = "https://disaister-backend-1.onrender.com/";
 
 let map;
 let userLat = null;
