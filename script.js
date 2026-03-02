@@ -17,8 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
 function initMap() {
   map = L.map("map");
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png")
-    .addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
 
   markersLayer = L.layerGroup().addTo(map);
 
@@ -44,22 +45,40 @@ async function fetchIncidents() {
   const incidents = await res.json();
 
   markersLayer.clearLayers();
+
+  if (heatLayer) {
+    map.removeLayer(heatLayer);
+  }
+
   let heatData = [];
+  let bounds = [];
 
   incidents.forEach(i => {
-    L.circleMarker([i.lat, i.lng], {
+
+    const marker = L.circleMarker([i.lat, i.lng], {
       radius: 8,
       color: i.severity >= 7 ? "red" :
-             i.severity >= 5 ? "orange" : "yellow"
+             i.severity >= 5 ? "orange" : "yellow",
+      fillOpacity: 0.8
     })
-    .bindPopup(`<b>${i.disaster_type}</b><br>${i.message}`)
-    .addTo(markersLayer);
+    .bindPopup(`<b>${i.disaster_type}</b><br>${i.message}`);
 
-    heatData.push([i.lat, i.lng, 1]);
+    marker.addTo(markersLayer);
+
+    // Strong heat intensity
+    heatData.push([i.lat, i.lng, 0.8]);
+
+    bounds.push([i.lat, i.lng]);
   });
 
-  if (heatLayer) map.removeLayer(heatLayer);
-  heatLayer = L.heatLayer(heatData, { radius: 25 }).addTo(map);
+  // FORCE heatmap visible
+  if (heatData.length > 0) {
+    heatLayer = L.heatLayer(heatData, {
+      radius: 40,
+      blur: 25,
+      maxZoom: 17
+    }).addTo(map);
+  }
 
   document.getElementById("primaryIncidentCount").innerText = incidents.length;
 
@@ -68,6 +87,9 @@ async function fetchIncidents() {
     document.getElementById("primaryRisk").innerText =
       max >= 7 ? "HIGH" :
       max >= 5 ? "MEDIUM" : "LOW";
+
+    // 🔥 THIS FIXES YOUR LOCATION ISSUE
+    map.fitBounds(bounds, { padding: [50, 50] });
   }
 }
 
@@ -123,7 +145,12 @@ async function triggerAction(type) {
 }
 
 async function checkDanger() {
-  const res = await fetch(`${API_BASE_URL}/is-user-in-danger?lat=${userLat}&lng=${userLng}`);
+  if (!userLat) return;
+
+  const res = await fetch(
+    `${API_BASE_URL}/is-user-in-danger?lat=${userLat}&lng=${userLng}`
+  );
+
   const data = await res.json();
 
   if (data.in_danger) {
@@ -136,8 +163,14 @@ function initSearch() {
 
   input.addEventListener("keydown", async e => {
     if (e.key === "Enter") {
-      const query = input.value;
-      const geo = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
+
+      const query = input.value.trim();
+      if (!query) return;
+
+      const geo = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+      );
+
       const data = await geo.json();
 
       if (data.length > 0) {
@@ -148,11 +181,19 @@ function initSearch() {
 
         if (!monitored.includes(query)) {
           monitored.push(query);
-          document.getElementById("remoteLocationsContainer")
-            .innerHTML += `<div>• ${query}</div>`;
 
-          L.marker([lat, lng]).addTo(map).bindPopup("Monitored Location");
+          const container = document.getElementById("remoteLocationsContainer");
+
+          const div = document.createElement("div");
+          div.innerText = "• " + query;
+          container.appendChild(div);
+
+          L.marker([lat, lng])
+            .addTo(map)
+            .bindPopup("Monitored Location");
         }
+
+        input.value = "";
       }
     }
   });
