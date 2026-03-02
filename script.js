@@ -1,9 +1,8 @@
-const API_BASE_URL = "https://disaister-backend-2.onrender.com/";
+const API_BASE_URL = "https://YOUR-RENDER-URL.onrender.com";
 
 let map;
 let userLat = null;
 let userLng = null;
-
 let markersLayer;
 let heatLayer;
 let monitoredLocations = [];
@@ -20,7 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 /* ---------------- MAP ---------------- */
 
 async function initMap() {
-  map = L.map("map").setView([20, 78], 5);
+  map = L.map("map").setView([22.5, 79.5], 5);
 
   L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -66,11 +65,9 @@ async function fetchIncidents() {
       color: color
     })
       .addTo(markersLayer)
-      .bindPopup(`${i.disaster_type}<br>${i.message}`);
+      .bindPopup(`<b>${i.disaster_type}</b><br>${i.message}`);
 
-    if (i.severity >= 6) {
-      heatData.push([i.lat, i.lng, i.severity / 10]);
-    }
+    heatData.push([i.lat, i.lng, Math.min(i.severity / 10, 1)]);
 
     if (userLat && distance(userLat, userLng, i.lat, i.lng) < 0.5 && i.severity >= 7) {
       highRisk = true;
@@ -78,7 +75,7 @@ async function fetchIncidents() {
   });
 
   if (heatLayer) map.removeLayer(heatLayer);
-  heatLayer = L.heatLayer(heatData, { radius: 25 }).addTo(map);
+  heatLayer = L.heatLayer(heatData, { radius: 30, blur: 25 }).addTo(map);
 
   document.getElementById("primaryIncidentCount").innerText = incidents.length;
   document.getElementById("primaryRisk").innerText = highRisk ? "HIGH" : "LOW";
@@ -95,7 +92,7 @@ async function sendAIQuery() {
 
   const res = await fetch(`${API_BASE_URL}/analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       message,
       lat: userLat,
@@ -105,10 +102,10 @@ async function sendAIQuery() {
 
   const data = await res.json();
 
-  alert(`AI Analysis:
-Type: ${data.disaster_type}
-Risk: ${data.risk_level}
-Confidence: ${data.confidence}%`);
+  if (!data.disaster_type) {
+    alert("AI could not classify this incident.");
+    return;
+  }
 
   fetchIncidents();
 }
@@ -120,7 +117,7 @@ async function triggerSOS() {
 
   await fetch(`${API_BASE_URL}/sos`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       name: "User",
       contact: "N/A",
@@ -130,11 +127,14 @@ async function triggerSOS() {
   });
 
   L.circle([userLat, userLng], {
-    radius: 500,
+    radius: 700,
     color: "red"
   }).addTo(map);
 
-  alert("SOS activated. Rescue team notified.");
+  L.popup()
+    .setLatLng([userLat, userLng])
+    .setContent("🚨 SOS Activated. Rescue team dispatched.")
+    .openOn(map);
 }
 
 /* ---------------- QUICK ACTIONS ---------------- */
@@ -144,23 +144,22 @@ function triggerAction(type) {
 
   if (type === "drone") {
     const drone = L.marker([userLat - 1, userLng]).addTo(map);
-    drone.bindPopup("Drone dispatched").openPopup();
-
+    drone.bindPopup("🚁 Drone incoming...").openPopup();
     setTimeout(() => {
       drone.setLatLng([userLat, userLng]);
     }, 2000);
   }
 
   if (type === "aid") {
-    L.marker([userLat, userLng])
-      .addTo(map)
-      .bindPopup("Medical Aid dispatched")
-      .openPopup();
+    L.popup()
+      .setLatLng([userLat, userLng])
+      .setContent("🩺 Medical Aid arriving at your location.")
+      .openOn(map);
   }
 
   if (type === "evacuate") {
     L.circle([userLat, userLng], {
-      radius: 1000,
+      radius: 1200,
       color: "yellow"
     }).addTo(map);
   }
@@ -184,7 +183,7 @@ function initSearch() {
     const query = input.value;
 
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`
     );
 
     const data = await res.json();
@@ -222,6 +221,7 @@ function renderMonitoring() {
 
 function distance(lat1, lon1, lat2, lon2) {
   return Math.sqrt(
-    Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2)
+    Math.pow(lat1 - lat2, 2) +
+    Math.pow(lon1 - lon2, 2)
   );
 }
