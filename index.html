@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>disAIster - Global Response System</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="flex flex-col h-screen">
+
+<header class="header px-4 py-3 relative z-50 premium-header">
+
+  <div class="flex items-center justify-between">
+
+    <!-- LOGO SECTION -->
+    <div class="flex items-center gap-3 group">
+
+      <div class="logo-glow"></div>
+
+      <img src="logo.png"
+           class="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-110 drop-shadow-xl relative z-10">
+
+      <img src="textlogo.png"
+           class="h-8 w-auto object-contain opacity-90 transition-opacity duration-300 group-hover:opacity-100 relative z-10">
+    </div>
+
+    <!-- STATUS -->
+    <div class="flex items-center gap-4">
+
+      <div class="flex items-center gap-2">
+        <div class="system-dot"></div>
+        <span class="text-sm mono tracking-wider text-[var(--text-secondary)]">
+          SYSTEM ONLINE
+        </span>
+      </div>
+
+      <span id="currentTime"
+            class="text-sm mono text-[var(--text-muted)]"></span>
+
+    </div>
+  </div>
+
+</header>
+
+<main class="flex-1 flex overflow-hidden relative">
+
+  <!-- LEFT PANEL -->
+  <aside id="leftPanel" class="sidebar h-full p-3 z-10 flex flex-col gap-3" style="width: 320px;">
+
+    <div class="panel flex-1 flex flex-col overflow-hidden">
+      <div class="panel-header">
+        <span class="panel-title">Primary Incident Zone</span>
+      </div>
+
+      <div class="p-3 grid grid-cols-2 gap-2 border-b border-[var(--border-color)]">
+        <div class="stat-card">
+          <div class="text-xs text-[var(--text-muted)]">Incidents</div>
+          <div id="primaryIncidentCount" class="stat-value critical mono">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="text-xs text-[var(--text-muted)]">Risk Level</div>
+          <div id="primaryRisk" class="stat-value-sm mono">LOW</div>
+        </div>
+      </div>
+
+      <div id="primaryAlertStream" class="flex-1 overflow-y-auto p-3"></div>
+    </div>
+
+  </aside>
+
+  <!-- MAP -->
+  <div class="flex-1 relative">
+    <div id="map" class="absolute inset-0"></div>
+
+    <!-- FILTERS -->
+    <div class="floating-filters z-[1000]">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="fire">Fire</button>
+      <button class="filter-btn" data-filter="flood">Flood</button>
+      <button class="filter-btn" data-filter="earthquake">Quake</button>
+      <button class="filter-btn" data-filter="cyclone">Cyclone</button>
+    </div>
+
+    <!-- LAYER BUTTONS -->
+    <div class="absolute bottom-24 right-3 z-[1000] flex flex-col gap-2">
+      <button class="layer-btn active" onclick="switchLayer('dark')">🌑</button>
+      <button class="layer-btn" onclick="switchLayer('satellite')">🛰</button>
+      <button class="layer-btn" onclick="switchLayer('rain')">🌧</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <aside id="rightPanel" class="sidebar h-full p-3 z-10 flex flex-col gap-3" style="width: 320px;">
+
+    <div class="panel p-4 text-center border border-red-500">
+      <div id="sosBtn" onclick="triggerSOS()" class="text-2xl font-bold text-red-500 cursor-pointer">SOS</div>
+      <div id="sosStatus" class="text-xs mt-2">TAP TO ACTIVATE</div>
+    </div>
+
+    <div class="panel flex flex-col overflow-hidden">
+      <div class="panel-header">
+        <span class="panel-title">AI Analysis</span>
+      </div>
+
+      <div id="aiChatContainer" class="flex-1 overflow-y-auto p-3 space-y-3"></div>
+
+      <div class="p-2 border-t border-[var(--border-color)]">
+        <div class="relative">
+          <input id="aiInput" class="search-input w-full pr-10 py-2 text-sm rounded-lg" placeholder="Report an incident..." onkeydown="if(event.key==='Enter')sendAIQuery()">
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 text-cyan-400" onclick="sendAIQuery()">➤</button>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>

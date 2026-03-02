@@ -1,0 +1,232 @@
+:root {
+  --bg-primary: #06090f;
+  --bg-secondary: #0d1320;
+  --bg-card: #111827;
+  --bg-elevated: #1a2332;
+
+  --accent-primary: #00e5cc;
+  --accent-secondary: #00b4d8;
+
+  --alert-critical: #ff3b5c;
+  --alert-high: #ff8c42;
+  --alert-medium: #ffc145;
+  --alert-low: #4ade80;
+
+  --text-primary: #f0f4f8;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --border-color: #1e293b;
+}
+
+/* ========================= */
+/* GLOBAL */
+/* ========================= */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.mono {
+  font-family: monospace;
+}
+
+/* ========================= */
+/* HEADER */
+/* ========================= */
+
+.header {
+  background: linear-gradient(180deg, var(--bg-secondary), transparent);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* ========================= */
+/* SIDEBAR */
+/* ========================= */
+
+.sidebar {
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ========================= */
+/* PANELS */
+/* ========================= */
+
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+/* ========================= */
+/* STAT VALUES */
+/* ========================= */
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.stat-value.critical {
+  color: var(--alert-critical);
+}
+
+/* ========================= */
+/* INPUT */
+/* ========================= */
+
+.search-input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--accent-primary);
+}
+
+/* ========================= */
+/* MAP */
+/* ========================= */
+
+#map {
+  height: 100%;
+  width: 100%;
+  background: var(--bg-secondary);
+}
+
+/* ========================= */
+/* LAYER BUTTONS */
+/* ========================= */
+
+.layer-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.layer-btn:hover {
+  border-color: var(--accent-primary);
+  transform: scale(1.05);
+}
+
+/* ========================= */
+/* AI PANEL */
+/* ========================= */
+
+#aiChatContainer {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ========================= */
+/* SOS */
+/* ========================= */
+
+#sosBtn {
+  font-weight: bold;
+  padding: 20px;
+  border: 3px solid var(--alert-critical);
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+#sosBtn:hover {
+  background: var(--alert-critical);
+  color: white;
+  transform: scale(1.1);
+}
+
+/* ========================= */
+/* HEATMAP ADJUSTMENTS */
+/* ========================= */
+
+.leaflet-heatmap-layer {
+  opacity: 0.6;
+}
+
+/* ========================= */
+/* SCROLLBAR */
+/* ========================= */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+/* ============================= */
+/* PREMIUM HEADER ENHANCEMENTS */
+/* ============================= */
+
+.premium-header {
+  background: linear-gradient(
+    180deg,
+    rgba(13, 19, 32, 0.95) 0%,
+    rgba(6, 9, 15, 0.85) 100%
+  );
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0, 229, 204, 0.15);
+  position: relative;
+}
+
+/* Logo glow background */
+.logo-glow {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  background: radial-gradient(circle,
+      rgba(0, 229, 204, 0.25) 0%,
+      transparent 70%);
+  filter: blur(20px);
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+/* Pulsing animation */
+@keyframes pulseGlow {
+  0% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0.6; transform: scale(1); }
+}
+
+/* System status animated dot */
+.system-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--alert-low);
+  box-shadow: 0 0 8px var(--alert-low);
+  animation: systemPulse 2s infinite;
+}
+
+@keyframes systemPulse {
+  0% { box-shadow: 0 0 4px var(--alert-low); }
+  50% { box-shadow: 0 0 12px var(--alert-low); }
+  100% { box-shadow: 0 0 4px var(--alert-low); }
+}
