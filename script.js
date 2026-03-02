@@ -1,47 +1,50 @@
-const API_BASE_URL = "https://disaister-backend.onrender.com";
+const API_BASE_URL = "https://disaister-backend-2.onrender.com/";
 
 let map;
-let markersLayer;
-let heatLayer;
-let userMarker;
 let userLat = null;
 let userLng = null;
-let monitored = [];
 
-document.addEventListener("DOMContentLoaded", () => {
-  initMap();
+let markersLayer;
+let heatLayer;
+let monitoredLocations = [];
+
+/* ---------------- INIT ---------------- */
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await initMap();
   initSearch();
   fetchIncidents();
   setInterval(fetchIncidents, 15000);
 });
 
-function initMap() {
-  map = L.map("map");
+/* ---------------- MAP ---------------- */
 
-  const satellite = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-  );
+async function initMap() {
+  map = L.map("map").setView([20, 78], 5);
 
-  satellite.addTo(map);
+  L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 18 }
+  ).addTo(map);
 
   markersLayer = L.layerGroup().addTo(map);
 
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
+    navigator.geolocation.getCurrentPosition((pos) => {
       userLat = pos.coords.latitude;
       userLng = pos.coords.longitude;
 
-      map.setView([userLat, userLng], 6);
+      map.setView([userLat, userLng], 10);
 
-      userMarker = L.marker([userLat, userLng])
+      L.marker([userLat, userLng])
         .addTo(map)
         .bindPopup("You are here")
         .openPopup();
     });
-  } else {
-    map.setView([20, 78], 5);
   }
 }
+
+/* ---------------- INCIDENTS + HEATMAP ---------------- */
 
 async function fetchIncidents() {
   const res = await fetch(`${API_BASE_URL}/incidents`);
@@ -49,86 +52,75 @@ async function fetchIncidents() {
 
   markersLayer.clearLayers();
 
-  if (heatLayer) {
-    map.removeLayer(heatLayer);
-  }
-
   let heatData = [];
-  let bounds = [];
+  let highRisk = false;
 
-  incidents.forEach(i => {
-    const marker = L.circleMarker([i.lat, i.lng], {
-      radius: 10,
-      color: i.severity >= 7 ? "#ff3b3b"
-             : i.severity >= 5 ? "#ff9f1a"
-             : "#ffd60a",
-      fillOpacity: 0.9
-    }).bindPopup(
-      `<b>${i.disaster_type}</b><br>${i.message}<br>Severity: ${i.severity}`
-    );
+  incidents.forEach((i) => {
+    const color =
+      i.severity >= 8 ? "red" :
+      i.severity >= 6 ? "orange" :
+      i.severity >= 4 ? "yellow" : "green";
 
-    marker.addTo(markersLayer);
+    L.circleMarker([i.lat, i.lng], {
+      radius: 8,
+      color: color
+    })
+      .addTo(markersLayer)
+      .bindPopup(`${i.disaster_type}<br>${i.message}`);
 
-    // Strong heat intensity
-    heatData.push([i.lat, i.lng, 1]);
+    if (i.severity >= 6) {
+      heatData.push([i.lat, i.lng, i.severity / 10]);
+    }
 
-    bounds.push([i.lat, i.lng]);
+    if (userLat && distance(userLat, userLng, i.lat, i.lng) < 0.5 && i.severity >= 7) {
+      highRisk = true;
+    }
   });
 
-  if (heatData.length > 0) {
-    heatLayer = L.heatLayer(heatData, {
-      radius: 50,
-      blur: 30,
-      maxZoom: 12,
-      gradient: {
-        0.2: "blue",
-        0.4: "lime",
-        0.6: "orange",
-        0.8: "red"
-      }
-    }).addTo(map);
+  if (heatLayer) map.removeLayer(heatLayer);
+  heatLayer = L.heatLayer(heatData, { radius: 25 }).addTo(map);
 
-    heatLayer.bringToFront();
-
-    map.fitBounds(bounds, { padding: [80, 80] });
-  }
-
-  document.getElementById("primaryIncidentCount").innerText =
-    incidents.length;
-
-  if (incidents.length > 0) {
-    const max = Math.max(...incidents.map(i => i.severity));
-    document.getElementById("primaryRisk").innerText =
-      max >= 7 ? "HIGH"
-      : max >= 5 ? "MEDIUM"
-      : "LOW";
-  }
+  document.getElementById("primaryIncidentCount").innerText = incidents.length;
+  document.getElementById("primaryRisk").innerText = highRisk ? "HIGH" : "LOW";
 }
+
+/* ---------------- AI ---------------- */
 
 async function sendAIQuery() {
   const input = document.getElementById("aiInput");
-  if (!input.value || userLat === null) return;
+  const message = input.value.trim();
+  if (!message || !userLat) return;
 
-  await fetch(`${API_BASE_URL}/analyze`, {
+  input.value = "";
+
+  const res = await fetch(`${API_BASE_URL}/analyze`, {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      message: input.value,
+      message,
       lat: userLat,
       lng: userLng
     })
   });
 
-  input.value = "";
+  const data = await res.json();
+
+  alert(`AI Analysis:
+Type: ${data.disaster_type}
+Risk: ${data.risk_level}
+Confidence: ${data.confidence}%`);
+
   fetchIncidents();
 }
+
+/* ---------------- SOS ---------------- */
 
 async function triggerSOS() {
   if (!userLat) return;
 
   await fetch(`${API_BASE_URL}/sos`, {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: "User",
       contact: "N/A",
@@ -137,63 +129,99 @@ async function triggerSOS() {
     })
   });
 
-  alert("SOS Activated");
+  L.circle([userLat, userLng], {
+    radius: 500,
+    color: "red"
+  }).addTo(map);
+
+  alert("SOS activated. Rescue team notified.");
 }
 
-async function triggerAction(type) {
+/* ---------------- QUICK ACTIONS ---------------- */
+
+function triggerAction(type) {
   if (!userLat) return;
 
-  await fetch(`${API_BASE_URL}/action`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      type: type,
-      lat: userLat,
-      lng: userLng
-    })
-  });
+  if (type === "drone") {
+    const drone = L.marker([userLat - 1, userLng]).addTo(map);
+    drone.bindPopup("Drone dispatched").openPopup();
 
-  alert(type.toUpperCase() + " initiated");
+    setTimeout(() => {
+      drone.setLatLng([userLat, userLng]);
+    }, 2000);
+  }
+
+  if (type === "aid") {
+    L.marker([userLat, userLng])
+      .addTo(map)
+      .bindPopup("Medical Aid dispatched")
+      .openPopup();
+  }
+
+  if (type === "evacuate") {
+    L.circle([userLat, userLng], {
+      radius: 1000,
+      color: "yellow"
+    }).addTo(map);
+  }
+
+  if (type === "lockdown") {
+    L.circle([userLat, userLng], {
+      radius: 1500,
+      color: "purple"
+    }).addTo(map);
+  }
 }
+
+/* ---------------- SEARCH ---------------- */
 
 function initSearch() {
   const input = document.getElementById("locationSearch");
 
-  input.addEventListener("keydown", async e => {
-    if (e.key === "Enter") {
+  input.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter") return;
 
-      const query = input.value.trim();
-      if (!query) return;
+    const query = input.value;
 
-      const geo = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
-      );
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+    );
 
-      const data = await geo.json();
+    const data = await res.json();
+    if (!data.length) return;
 
-      if (data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
+    userLat = parseFloat(data[0].lat);
+    userLng = parseFloat(data[0].lon);
 
-        map.setView([lat, lng], 8);
+    map.setView([userLat, userLng], 10);
 
-        if (!monitored.includes(query)) {
-          monitored.push(query);
+    L.marker([userLat, userLng])
+      .addTo(map)
+      .bindPopup("Searched Location")
+      .openPopup();
 
-          const container =
-            document.getElementById("remoteLocationsContainer");
-
-          const div = document.createElement("div");
-          div.textContent = "• " + query;
-          container.appendChild(div);
-
-          L.marker([lat, lng])
-            .addTo(map)
-            .bindPopup("Monitored Location");
-        }
-
-        input.value = "";
-      }
-    }
+    monitoredLocations.push(query);
+    renderMonitoring();
   });
+}
+
+/* ---------------- MONITORING ---------------- */
+
+function renderMonitoring() {
+  const container = document.getElementById("remoteLocationsContainer");
+  container.innerHTML = "";
+
+  monitoredLocations.forEach((loc) => {
+    const div = document.createElement("div");
+    div.innerText = "• " + loc;
+    container.appendChild(div);
+  });
+}
+
+/* ---------------- UTIL ---------------- */
+
+function distance(lat1, lon1, lat2, lon2) {
+  return Math.sqrt(
+    Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2)
+  );
 }
