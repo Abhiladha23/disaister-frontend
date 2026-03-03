@@ -21,89 +21,102 @@
 <body class="flex flex-col h-screen bg-black text-white">
 
 <!-- HEADER -->
-<header class="flex justify-between items-center px-6 py-3 bg-[#0b1220]">
+<header class="flex justify-between items-center px-6 py-3 bg-[#0b1220] shadow-md">
+
   <div class="flex items-center gap-3">
-    <img src="logo.png" class="h-8">
-    <h1 class="text-xl font-bold">disAIster</h1>
+    <img src="logo.png" class="h-8 object-contain">
+    <h1 class="text-xl font-bold tracking-wide">disAIster</h1>
   </div>
 
+  <!-- SEARCH -->
   <input id="searchInput"
          type="text"
          placeholder="Search location..."
-         class="px-3 py-2 rounded bg-[#1a2336] text-sm w-72">
+         class="px-4 py-2 rounded-lg bg-[#1a2336] text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500">
 </header>
 
-<!-- MAIN -->
-<main class="flex flex-1">
+
+<!-- MAIN LAYOUT -->
+<main class="flex flex-1 overflow-hidden">
 
   <!-- LEFT PANEL -->
-  <div class="w-64 bg-[#0f172a] p-4 flex flex-col gap-6">
+  <aside class="w-64 bg-[#0f172a] p-6 flex flex-col gap-6 shadow-inner">
 
     <div>
-      <div class="text-sm opacity-70">Incidents</div>
-      <div id="incidentCount" class="text-2xl font-bold">0</div>
+      <div class="text-sm opacity-70 mb-1">Incidents</div>
+      <div id="incidentCount" class="text-3xl font-bold text-red-500">0</div>
     </div>
 
     <div>
-      <div class="text-sm opacity-70">Risk Level</div>
-      <div id="primaryRisk" class="text-lg">--</div>
+      <div class="text-sm opacity-70 mb-1">Risk Level</div>
+      <div id="primaryRisk"
+           class="text-lg font-semibold text-yellow-400">
+           --
+      </div>
     </div>
 
     <div>
-      <div class="text-sm opacity-70">Remote Monitoring</div>
+      <div class="text-sm opacity-70 mb-2">Remote Monitoring</div>
       <div id="remoteLocationsContainer"
-           class="text-xs mt-2 space-y-1"></div>
+           class="text-xs space-y-2 opacity-80">
+      </div>
     </div>
 
-  </div>
+  </aside>
+
 
   <!-- MAP -->
-  <div id="map" class="flex-1"></div>
+  <div id="map" class="flex-1 relative"></div>
+
 
   <!-- RIGHT PANEL -->
-  <div class="w-72 bg-[#0f172a] p-4 flex flex-col gap-4">
+  <aside class="w-80 bg-[#0f172a] p-6 flex flex-col gap-5 shadow-inner">
 
     <!-- SOS -->
     <button onclick="triggerSOS()"
-            class="bg-red-600 py-2 rounded font-bold">
-      SOS
+            class="bg-red-600 hover:bg-red-700 transition-all py-3 rounded-lg font-bold text-white shadow-lg">
+      SOS EMERGENCY
     </button>
 
-    <!-- AI -->
-    <input id="incidentInput"
-           placeholder="Report incident..."
-           class="w-full px-3 py-2 rounded bg-[#1a2336] text-sm"
-           onkeydown="if(event.key==='Enter')analyzeIncident()">
+    <!-- AI REPORT -->
+    <div class="flex flex-col gap-2">
+      <input id="incidentInput"
+             placeholder="Report incident..."
+             class="px-4 py-2 rounded-lg bg-[#1a2336] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+             onkeydown="if(event.key==='Enter')analyzeIncident()">
 
-    <button onclick="analyzeIncident()"
-            class="bg-blue-600 py-2 rounded">
-      Analyze
-    </button>
-
-    <!-- QUICK ACTIONS -->
-    <div class="grid grid-cols-2 gap-2">
-      <button onclick="alert('Drone deployed to your location')"
-              class="bg-blue-600 py-2 rounded text-sm">
-        Deploy Drone
-      </button>
-
-      <button onclick="alert('Aid team dispatched')"
-              class="bg-green-600 py-2 rounded text-sm">
-        Request Aid
-      </button>
-
-      <button onclick="alert('Evacuation order sent')"
-              class="bg-yellow-600 py-2 rounded text-sm">
-        Evacuate
-      </button>
-
-      <button onclick="alert('Lockdown activated')"
-              class="bg-purple-600 py-2 rounded text-sm">
-        Lockdown
+      <button onclick="analyzeIncident()"
+              class="bg-blue-600 hover:bg-blue-700 transition-all py-2 rounded-lg text-sm font-semibold">
+        Analyze Incident
       </button>
     </div>
 
-  </div>
+    <!-- QUICK ACTIONS -->
+    <div class="grid grid-cols-2 gap-3 mt-4">
+
+      <button onclick="deployDrone()"
+              class="bg-blue-600 hover:bg-blue-700 py-2 rounded-lg text-sm transition-all shadow-md">
+        Deploy Drone
+      </button>
+
+      <button onclick="requestAid()"
+              class="bg-green-600 hover:bg-green-700 py-2 rounded-lg text-sm transition-all shadow-md">
+        Request Aid
+      </button>
+
+      <button onclick="evacuateArea()"
+              class="bg-yellow-500 hover:bg-yellow-600 py-2 rounded-lg text-sm transition-all shadow-md">
+        Evacuate
+      </button>
+
+      <button onclick="lockdownArea()"
+              class="bg-purple-600 hover:bg-purple-700 py-2 rounded-lg text-sm transition-all shadow-md">
+        Lockdown
+      </button>
+
+    </div>
+
+  </aside>
 
 </main>
 
