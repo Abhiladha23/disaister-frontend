@@ -1,14 +1,26 @@
+// ================= CONFIG =================
+
 const API_BASE_URL = "https://disaister-backend.onrender.com";
 
 let map;
-let heatLayer;
-let userMarker;
-let searchMarker;
+let heatLayer = null;
+let userMarker = null;
+let searchMarker = null;
 
 let currentLat = 20.5937;
 let currentLng = 78.9629;
 
-// ================= INIT MAP =================
+
+// ================= INIT =================
+
+window.addEventListener("load", () => {
+    initMap();
+    attachSearchListener();
+    fetchIncidents();
+});
+
+
+// ================= MAP INIT =================
 
 function initMap() {
 
@@ -16,89 +28,109 @@ function initMap() {
 
     L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        { attribution: "&copy; OpenStreetMap" }
+        { attribution: "&copy; OpenStreetMap contributors" }
     ).addTo(map);
 
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                currentLat = position.coords.latitude;
+                currentLng = position.coords.longitude;
 
-            currentLat = pos.coords.latitude;
-            currentLng = pos.coords.longitude;
+                map.setView([currentLat, currentLng], 12);
 
-            map.setView([currentLat, currentLng], 12);
-
-            userMarker = L.circleMarker([currentLat, currentLng], {
-                radius: 8,
-                color: "#00ffcc"
-            }).addTo(map).bindPopup("Your Location");
-        });
+                userMarker = L.circleMarker([currentLat, currentLng], {
+                    radius: 8,
+                    color: "#00ffcc"
+                }).addTo(map).bindPopup("Your Location");
+            },
+            error => {
+                console.log("Geolocation blocked or failed.");
+            }
+        );
     }
-
-    fetchIncidents();
 }
-
-window.onload = initMap;
 
 
 // ================= SEARCH =================
 
-document.getElementById("searchInput").addEventListener("keydown", function(e) {
-    if (e.key === "Enter") searchLocation();
-});
+function attachSearchListener() {
 
-async function searchLocation() {
+    const input = document.getElementById("searchInput");
+    if (!input) return;
 
-    const query = document.getElementById("searchInput").value;
-    if (!query) return;
+    input.addEventListener("keydown", async function (e) {
 
-    const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
-    );
+        if (e.key !== "Enter") return;
 
-    const data = await res.json();
-    if (!data.length) return;
+        const query = input.value.trim();
+        if (!query) return;
 
-    const lat = parseFloat(data[0].lat);
-    const lng = parseFloat(data[0].lon);
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+            );
 
-    currentLat = lat;      // 🔥 FIXED
-    currentLng = lng;      // 🔥 FIXED
+            const data = await res.json();
+            if (!data.length) return;
 
-    map.setView([lat, lng], 12);
+            const lat = parseFloat(data[0].lat);
+            const lng = parseFloat(data[0].lon);
 
-    if (searchMarker) map.removeLayer(searchMarker);
+            currentLat = lat;
+            currentLng = lng;
 
-    searchMarker = L.circleMarker([lat, lng], {
-        radius: 8,
-        color: "#ffcc00"
-    }).addTo(map).bindPopup("Selected Location").openPopup();
+            map.setView([lat, lng], 12);
+
+            if (searchMarker) map.removeLayer(searchMarker);
+
+            searchMarker = L.circleMarker([lat, lng], {
+                radius: 8,
+                color: "#ffcc00"
+            }).addTo(map).bindPopup(query).openPopup();
+
+        } catch (err) {
+            console.log("Search failed", err);
+        }
+    });
 }
 
 
-// ================= ANALYZE =================
+// ================= ANALYZE INCIDENT =================
 
 async function analyzeIncident() {
 
-    const message = document.getElementById("incidentInput").value;
+    const input = document.getElementById("incidentInput");
+    if (!input) return;
+
+    const message = input.value.trim();
     if (!message) return;
 
-    const res = await fetch(`${API_BASE_URL}/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            message,
-            lat: currentLat,
-            lng: currentLng
-        })
-    });
+    try {
 
-    const data = await res.json();
-    if (!data.disaster_type) return;
+        const res = await fetch(`${API_BASE_URL}/analyze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                message,
+                lat: currentLat,
+                lng: currentLng
+            })
+        });
 
-    // Update risk panel instead of alert
-    document.getElementById("primaryRisk").innerText = data.risk_level;
+        const data = await res.json();
 
-    fetchIncidents();
+        if (data.risk_level) {
+            document.getElementById("primaryRisk").innerText = data.risk_level;
+        }
+
+        input.value = "";
+
+        fetchIncidents();
+
+    } catch (err) {
+        console.log("Analyze failed", err);
+    }
 }
 
 
@@ -106,26 +138,32 @@ async function analyzeIncident() {
 
 async function fetchIncidents() {
 
-    const res = await fetch(`${API_BASE_URL}/incidents`);
-    const incidents = await res.json();
+    try {
 
-    if (!Array.isArray(incidents)) return;
+        const res = await fetch(`${API_BASE_URL}/incidents`);
+        const incidents = await res.json();
 
-    document.getElementById("incidentCount").innerText = incidents.length;
+        if (!Array.isArray(incidents)) return;
 
-    if (heatLayer) map.removeLayer(heatLayer);
+        document.getElementById("incidentCount").innerText = incidents.length;
 
-    const heatPoints = incidents.map(i => [
-        parseFloat(i.lat),
-        parseFloat(i.lng),
-        1
-    ]);
+        const heatPoints = incidents.map(i => [
+            parseFloat(i.lat),
+            parseFloat(i.lng),
+            1
+        ]);
 
-    heatLayer = L.heatLayer(heatPoints, {
-        radius: 35,
-        blur: 25,
-        maxZoom: 17
-    }).addTo(map);
+        if (heatLayer) map.removeLayer(heatLayer);
+
+        heatLayer = L.heatLayer(heatPoints, {
+            radius: 30,
+            blur: 25,
+            maxZoom: 17
+        }).addTo(map);
+
+    } catch (err) {
+        console.log("Fetch incidents failed", err);
+    }
 }
 
 
@@ -133,18 +171,41 @@ async function fetchIncidents() {
 
 async function triggerSOS() {
 
-    await fetch(`${API_BASE_URL}/sos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            name: "User",
-            contact: "9999999999",
-            lat: currentLat,
-            lng: currentLng
-        })
-    });
+    try {
 
-    // Visual feedback instead of popup
-    const btn = document.querySelector("button");
-    btn.classList.add("animate-pulse");
+        await fetch(`${API_BASE_URL}/sos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: "User",
+                contact: "9999999999",
+                lat: currentLat,
+                lng: currentLng
+            })
+        });
+
+        console.log("SOS Sent");
+
+    } catch (err) {
+        console.log("SOS failed", err);
+    }
+}
+
+
+// ================= ACTION BUTTONS =================
+
+function deployDrone() {
+    console.log("Drone dispatched to", currentLat, currentLng);
+}
+
+function requestAid() {
+    console.log("Aid team requested at", currentLat, currentLng);
+}
+
+function evacuateArea() {
+    console.log("Evacuation initiated");
+}
+
+function lockdownArea() {
+    console.log("Lockdown activated");
 }
