@@ -3,6 +3,7 @@ const API_BASE_URL = "https://disaister-backend.onrender.com";
 let map;
 let heatLayer;
 let searchMarker;
+let userMarker;
 
 let currentLat = 20.5937;
 let currentLng = 78.9629;
@@ -21,7 +22,7 @@ function initMap() {
 
             map.setView([currentLat, currentLng], 12);
 
-            L.marker([currentLat, currentLng])
+            userMarker = L.marker([currentLat, currentLng])
                 .addTo(map)
                 .bindPopup("You are here")
                 .openPopup();
@@ -33,17 +34,20 @@ function initMap() {
 
 window.onload = initMap;
 
-// SEARCH LOCATION
+
+// ================= SEARCH =================
+
 async function searchLocation() {
     const query = document.getElementById("searchInput").value;
     if (!query) return;
 
-    const response = await fetch(
+    const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
     );
 
-    const data = await response.json();
-    if (data.length === 0) {
+    const data = await res.json();
+
+    if (!data.length) {
         alert("Location not found");
         return;
     }
@@ -51,8 +55,8 @@ async function searchLocation() {
     const lat = parseFloat(data[0].lat);
     const lng = parseFloat(data[0].lon);
 
-    currentLat = lat;
-    currentLng = lng;
+    currentLat = lat;   // 🔥 IMPORTANT FIX
+    currentLng = lng;   // 🔥 IMPORTANT FIX
 
     map.setView([lat, lng], 12);
 
@@ -64,77 +68,100 @@ async function searchLocation() {
         .openPopup();
 }
 
-// ANALYZE INCIDENT
+
+// ================= ANALYZE =================
+
 async function analyzeIncident() {
     const message = document.getElementById("incidentInput").value;
 
     if (!message) {
-        alert("Enter incident description");
+        alert("Please enter incident description");
         return;
     }
 
-    const response = await fetch(`${API_BASE_URL}/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            message: message,
-            lat: currentLat,
-            lng: currentLng
-        })
-    });
+    try {
+        const res = await fetch(`${API_BASE_URL}/analyze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                message,
+                lat: currentLat,
+                lng: currentLng
+            })
+        });
 
-    const data = await response.json();
+        const data = await res.json();
 
-    if (!data.disaster_type) {
-        alert("AI classification failed");
-        return;
-    }
+        if (!data.disaster_type) {
+            alert("AI classification failed");
+            return;
+        }
 
-    alert(
-        `Type: ${data.disaster_type}
+        alert(
+            `Type: ${data.disaster_type}
 Severity: ${data.severity}
 Risk: ${data.risk_level}
 Confidence: ${data.confidence}%`
-    );
+        );
 
-    fetchIncidents();
+        fetchIncidents();
+
+    } catch (err) {
+        console.error(err);
+        alert("Analyze failed");
+    }
 }
 
-// FETCH INCIDENTS + HEATMAP
+
+// ================= FETCH INCIDENTS =================
+
 async function fetchIncidents() {
-    const response = await fetch(`${API_BASE_URL}/incidents`);
-    const incidents = await response.json();
+    try {
+        const res = await fetch(`${API_BASE_URL}/incidents`);
+        const incidents = await res.json();
 
-    if (!Array.isArray(incidents)) return;
+        if (!Array.isArray(incidents)) return;
 
-    document.getElementById("incidentCount").innerText = incidents.length;
+        document.getElementById("incidentCount").innerText = incidents.length;
 
-    if (heatLayer) map.removeLayer(heatLayer);
+        if (heatLayer) map.removeLayer(heatLayer);
 
-    const heatPoints = incidents.map(i => [
-        parseFloat(i.lat),
-        parseFloat(i.lng),
-        1
-    ]);
+        const heatPoints = incidents.map(i => [
+            parseFloat(i.lat),
+            parseFloat(i.lng),
+            1
+        ]);
 
-    heatLayer = L.heatLayer(heatPoints, {
-        radius: 30,
-        blur: 20
-    }).addTo(map);
+        heatLayer = L.heatLayer(heatPoints, {
+            radius: 30,
+            blur: 20,
+            maxZoom: 17
+        }).addTo(map);
+
+    } catch (err) {
+        console.error("Fetch incidents error:", err);
+    }
 }
 
-// SOS
-async function triggerSOS() {
-    await fetch(`${API_BASE_URL}/sos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            name: "User",
-            contact: "9999999999",
-            lat: currentLat,
-            lng: currentLng
-        })
-    });
 
-    alert("🚨 SOS Activated");
+// ================= SOS =================
+
+async function triggerSOS() {
+    try {
+        await fetch(`${API_BASE_URL}/sos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: "User",
+                contact: "9999999999",
+                lat: currentLat,
+                lng: currentLng
+            })
+        });
+
+        alert("🚨 SOS Activated");
+
+    } catch (err) {
+        console.error(err);
+    }
 }
