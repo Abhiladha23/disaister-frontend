@@ -1,227 +1,183 @@
-const API_BASE_URL = "https://disaister-backend.onrender.com";
+// ===============================
+// CONFIG
+// ===============================
+
+const API_BASE_URL = "https://disaister-backend.onrender.com"; // NO trailing slash
 
 let map;
-let userLat = null;
-let userLng = null;
-let markersLayer;
+let userMarker;
+let searchMarker;
 let heatLayer;
-let monitoredLocations = [];
 
-/* ---------------- INIT ---------------- */
+let currentLat = 0;
+let currentLng = 0;
 
-document.addEventListener("DOMContentLoaded", async () => {
-  await initMap();
-  initSearch();
-  fetchIncidents();
-  setInterval(fetchIncidents, 15000);
-});
+// ===============================
+// INITIALIZE MAP
+// ===============================
 
-/* ---------------- MAP ---------------- */
+function initMap() {
+    map = L.map("map").setView([20.5937, 78.9629], 5); // India center
 
-async function initMap() {
-  map = L.map("map").setView([22.5, 79.5], 5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors"
+    }).addTo(map);
 
-  L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    { maxZoom: 18 }
-  ).addTo(map);
+    // Try getting user location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+            currentLat = position.coords.latitude;
+            currentLng = position.coords.longitude;
 
-  markersLayer = L.layerGroup().addTo(map);
+            map.setView([currentLat, currentLng], 12);
 
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      userLat = pos.coords.latitude;
-      userLng = pos.coords.longitude;
+            userMarker = L.marker([currentLat, currentLng])
+                .addTo(map)
+                .bindPopup("You are here")
+                .openPopup();
 
-      map.setView([userLat, userLng], 10);
-
-      L.marker([userLat, userLng])
-        .addTo(map)
-        .bindPopup("You are here")
-        .openPopup();
-    });
-  }
-}
-
-/* ---------------- INCIDENTS + HEATMAP ---------------- */
-
-async function fetchIncidents() {
-  const res = await fetch(`${API_BASE_URL}/incidents`);
-  const incidents = await res.json();
-
-  markersLayer.clearLayers();
-
-  let heatData = [];
-  let highRisk = false;
-
-  incidents.forEach((i) => {
-    const color =
-      i.severity >= 8 ? "red" :
-      i.severity >= 6 ? "orange" :
-      i.severity >= 4 ? "yellow" : "green";
-
-    L.circleMarker([i.lat, i.lng], {
-      radius: 8,
-      color: color
-    })
-      .addTo(markersLayer)
-      .bindPopup(`<b>${i.disaster_type}</b><br>${i.message}`);
-
-    heatData.push([i.lat, i.lng, Math.min(i.severity / 10, 1)]);
-
-    if (userLat && distance(userLat, userLng, i.lat, i.lng) < 0.5 && i.severity >= 7) {
-      highRisk = true;
+        });
     }
-  });
 
-  if (heatLayer) map.removeLayer(heatLayer);
-  heatLayer = L.heatLayer(heatData, { radius: 30, blur: 25 }).addTo(map);
-
-  document.getElementById("primaryIncidentCount").innerText = incidents.length;
-  document.getElementById("primaryRisk").innerText = highRisk ? "HIGH" : "LOW";
+    fetchIncidents();
 }
 
-/* ---------------- AI ---------------- */
+window.onload = initMap;
 
-async function sendAIQuery() {
-  const input = document.getElementById("aiInput");
-  const message = input.value.trim();
-  if (!message || !userLat) return;
+// ===============================
+// SEARCH LOCATION
+// ===============================
 
-  input.value = "";
+async function searchLocation() {
+    const query = document.getElementById("searchInput").value;
 
-  const res = await fetch(`${API_BASE_URL}/analyze`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      message,
-      lat: userLat,
-      lng: userLng
-    })
-  });
+    if (!query) return;
 
-  const data = await res.json();
-
-  if (!data.disaster_type) {
-    alert("AI could not classify this incident.");
-    return;
-  }
-
-  fetchIncidents();
-}
-
-/* ---------------- SOS ---------------- */
-
-async function triggerSOS() {
-  if (!userLat) return;
-
-  await fetch(`${API_BASE_URL}/sos`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      name: "User",
-      contact: "N/A",
-      lat: userLat,
-      lng: userLng
-    })
-  });
-
-  L.circle([userLat, userLng], {
-    radius: 700,
-    color: "red"
-  }).addTo(map);
-
-  L.popup()
-    .setLatLng([userLat, userLng])
-    .setContent("🚨 SOS Activated. Rescue team dispatched.")
-    .openOn(map);
-}
-
-/* ---------------- QUICK ACTIONS ---------------- */
-
-function triggerAction(type) {
-  if (!userLat) return;
-
-  if (type === "drone") {
-    const drone = L.marker([userLat - 1, userLng]).addTo(map);
-    drone.bindPopup("🚁 Drone incoming...").openPopup();
-    setTimeout(() => {
-      drone.setLatLng([userLat, userLng]);
-    }, 2000);
-  }
-
-  if (type === "aid") {
-    L.popup()
-      .setLatLng([userLat, userLng])
-      .setContent("🩺 Medical Aid arriving at your location.")
-      .openOn(map);
-  }
-
-  if (type === "evacuate") {
-    L.circle([userLat, userLng], {
-      radius: 1200,
-      color: "yellow"
-    }).addTo(map);
-  }
-
-  if (type === "lockdown") {
-    L.circle([userLat, userLng], {
-      radius: 1500,
-      color: "purple"
-    }).addTo(map);
-  }
-}
-
-/* ---------------- SEARCH ---------------- */
-
-function initSearch() {
-  const input = document.getElementById("locationSearch");
-
-  input.addEventListener("keydown", async (e) => {
-    if (e.key !== "Enter") return;
-
-    const query = input.value;
-
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`
+    const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
     );
 
-    const data = await res.json();
-    if (!data.length) return;
+    const data = await response.json();
 
-    userLat = parseFloat(data[0].lat);
-    userLng = parseFloat(data[0].lon);
+    if (data.length === 0) {
+        alert("Location not found");
+        return;
+    }
 
-    map.setView([userLat, userLng], 10);
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon);
 
-    L.marker([userLat, userLng])
-      .addTo(map)
-      .bindPopup("Searched Location")
-      .openPopup();
+    map.setView([lat, lng], 12);
 
-    monitoredLocations.push(query);
-    renderMonitoring();
-  });
+    if (searchMarker) {
+        map.removeLayer(searchMarker);
+    }
+
+    searchMarker = L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup("Searched Location")
+        .openPopup();
+
+    // 🔥 VERY IMPORTANT FIX
+    currentLat = lat;
+    currentLng = lng;
+
+    console.log("Updated coordinates:", currentLat, currentLng);
 }
 
-/* ---------------- MONITORING ---------------- */
+// ===============================
+// ANALYZE INCIDENT
+// ===============================
 
-function renderMonitoring() {
-  const container = document.getElementById("remoteLocationsContainer");
-  container.innerHTML = "";
+async function analyzeIncident() {
+    const message = document.getElementById("incidentInput").value;
 
-  monitoredLocations.forEach((loc) => {
-    const div = document.createElement("div");
-    div.innerText = "• " + loc;
-    container.appendChild(div);
-  });
+    if (!message) {
+        alert("Please enter incident description");
+        return;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            message: message,
+            lat: currentLat,
+            lng: currentLng
+        })
+    });
+
+    const data = await response.json();
+
+    if (!data || !data.disaster_type) {
+        console.error("Invalid response:", data);
+        alert("AI classification failed");
+        return;
+    }
+
+    alert(
+        `AI Analysis:\nType: ${data.disaster_type}\nSeverity: ${data.severity}\nRisk: ${data.risk_level}\nConfidence: ${data.confidence}%`
+    );
+
+    fetchIncidents();
 }
 
-/* ---------------- UTIL ---------------- */
+// ===============================
+// FETCH INCIDENTS + HEATMAP
+// ===============================
 
-function distance(lat1, lon1, lat2, lon2) {
-  return Math.sqrt(
-    Math.pow(lat1 - lat2, 2) +
-    Math.pow(lon1 - lon2, 2)
-  );
+async function fetchIncidents() {
+    const response = await fetch(`${API_BASE_URL}/incidents`);
+    const incidents = await response.json();
+
+    if (!Array.isArray(incidents)) {
+        console.error("Invalid incidents:", incidents);
+        return;
+    }
+
+    // Update incident count
+    document.getElementById("incidentCount").innerText = incidents.length;
+
+    if (incidents.length === 0) return;
+
+    // Remove old heat layer
+    if (heatLayer) {
+        map.removeLayer(heatLayer);
+    }
+
+    const heatPoints = incidents.map(i => [
+        parseFloat(i.lat),
+        parseFloat(i.lng),
+        1
+    ]);
+
+    heatLayer = L.heatLayer(heatPoints, {
+        radius: 30,
+        blur: 20,
+        maxZoom: 17
+    }).addTo(map);
+}
+
+// ===============================
+// SOS
+// ===============================
+
+async function triggerSOS() {
+    const name = prompt("Enter your name:");
+    const contact = prompt("Enter your contact number:");
+
+    if (!name || !contact) return;
+
+    await fetch(`${API_BASE_URL}/sos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            name: name,
+            contact: contact,
+            lat: currentLat,
+            lng: currentLng
+        })
+    });
+
+    alert("🚨 SOS Activated. Help is on the way!");
 }
