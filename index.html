@@ -1,71 +1,112 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>disAIster</title>
+  <meta charset="UTF-8">
+  <title>disAIster</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial;
-            display: flex;
-            height: 100vh;
-        }
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-        #map {
-            flex: 3;
-        }
+  <!-- Heatmap -->
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
-        #panel {
-            flex: 1;
-            background: #0f172a;
-            color: white;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        input, button {
-            padding: 10px;
-            margin-top: 10px;
-        }
-
-        button {
-            cursor: pointer;
-        }
-
-        #incidentCount {
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-    </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
+<body class="flex flex-col h-screen bg-black text-white">
 
-<div id="map"></div>
+<!-- HEADER -->
+<header class="flex justify-between items-center px-6 py-3 bg-[#0b1220]">
+  <div class="flex items-center gap-3">
+    <img src="logo.png" class="h-8">
+    <h1 class="text-xl font-bold">disAIster</h1>
+  </div>
 
-<div id="panel">
-    <h2>disAIster</h2>
+  <input id="searchInput"
+         type="text"
+         placeholder="Search location..."
+         class="px-3 py-2 rounded bg-[#1a2336] text-sm w-72">
+</header>
 
-    <div>Incidents: <span id="incidentCount">0</span></div>
+<!-- MAIN -->
+<main class="flex flex-1">
 
-    <input id="searchInput" placeholder="Search location..." />
-    <button onclick="searchLocation()">Search</button>
+  <!-- LEFT PANEL -->
+  <div class="w-64 bg-[#0f172a] p-4 flex flex-col gap-6">
 
-    <hr>
+    <div>
+      <div class="text-sm opacity-70">Incidents</div>
+      <div id="incidentCount" class="text-2xl font-bold">0</div>
+    </div>
 
-    <input id="incidentInput" placeholder="Describe incident..." />
-    <button onclick="analyzeIncident()">Analyze Incident</button>
+    <div>
+      <div class="text-sm opacity-70">Risk Level</div>
+      <div id="primaryRisk" class="text-lg">--</div>
+    </div>
 
-    <hr>
+    <div>
+      <div class="text-sm opacity-70">Remote Monitoring</div>
+      <div id="remoteLocationsContainer"
+           class="text-xs mt-2 space-y-1"></div>
+    </div>
 
-    <button onclick="triggerSOS()">🚨 SOS</button>
-</div>
+  </div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <!-- MAP -->
+  <div id="map" class="flex-1"></div>
+
+  <!-- RIGHT PANEL -->
+  <div class="w-72 bg-[#0f172a] p-4 flex flex-col gap-4">
+
+    <!-- SOS -->
+    <button onclick="triggerSOS()"
+            class="bg-red-600 py-2 rounded font-bold">
+      SOS
+    </button>
+
+    <!-- AI -->
+    <input id="incidentInput"
+           placeholder="Report incident..."
+           class="w-full px-3 py-2 rounded bg-[#1a2336] text-sm"
+           onkeydown="if(event.key==='Enter')analyzeIncident()">
+
+    <button onclick="analyzeIncident()"
+            class="bg-blue-600 py-2 rounded">
+      Analyze
+    </button>
+
+    <!-- QUICK ACTIONS -->
+    <div class="grid grid-cols-2 gap-2">
+      <button onclick="alert('Drone deployed to your location')"
+              class="bg-blue-600 py-2 rounded text-sm">
+        Deploy Drone
+      </button>
+
+      <button onclick="alert('Aid team dispatched')"
+              class="bg-green-600 py-2 rounded text-sm">
+        Request Aid
+      </button>
+
+      <button onclick="alert('Evacuation order sent')"
+              class="bg-yellow-600 py-2 rounded text-sm">
+        Evacuate
+      </button>
+
+      <button onclick="alert('Lockdown activated')"
+              class="bg-purple-600 py-2 rounded text-sm">
+        Lockdown
+      </button>
+    </div>
+
+  </div>
+
+</main>
+
 <script src="script.js"></script>
 
 </body>
