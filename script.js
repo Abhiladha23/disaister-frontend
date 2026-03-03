@@ -1,6 +1,89 @@
-// ================= CONFIG =================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Disaster Intelligence System</title>
 
-const API_BASE_URL = "https://disaister-backend.onrender.com";
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: white;
+}
+
+header {
+    padding: 15px;
+    background: #111827;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+input, button {
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+    margin: 5px 0;
+}
+
+button {
+    background: #00ffcc;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #00ccaa;
+}
+
+#map {
+    height: 70vh;
+    width: 100%;
+}
+
+.panel {
+    padding: 15px;
+}
+</style>
+</head>
+<body>
+
+<header>
+    <h2>🌍 Disaster Intelligence Map</h2>
+    <input id="searchInput" placeholder="Search location & press Enter"/>
+</header>
+
+<div id="map"></div>
+
+<div class="panel">
+    <h3>Report Incident</h3>
+    <input id="incidentInput" placeholder="Describe incident..." />
+    <button onclick="analyzeIncident()">Analyze</button>
+
+    <p>Primary Risk: <span id="primaryRisk">None</span></p>
+    <p>Total Incidents: <span id="incidentCount">0</span></p>
+
+    <hr>
+
+    <button onclick="triggerSOS()">🚨 Trigger SOS</button>
+    <button onclick="deployDrone()">🚁 Deploy Drone</button>
+    <button onclick="requestAid()">🚑 Request Aid</button>
+    <button onclick="evacuateArea()">🏃 Evacuate</button>
+    <button onclick="lockdownArea()">🔒 Lockdown</button>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Heat Plugin -->
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script>
+const API_BASE_URL = "https://disaister-backend.onrender.com"; // change if needed
 
 let map;
 let heatLayer = null;
@@ -10,20 +93,13 @@ let searchMarker = null;
 let currentLat = 20.5937;
 let currentLng = 78.9629;
 
-
-// ================= INIT =================
-
 window.addEventListener("load", () => {
     initMap();
     attachSearchListener();
     fetchIncidents();
 });
 
-
-// ================= MAP INIT =================
-
 function initMap() {
-
     map = L.map("map").setView([currentLat, currentLng], 5);
 
     L.tileLayer(
@@ -44,23 +120,16 @@ function initMap() {
                     color: "#00ffcc"
                 }).addTo(map).bindPopup("Your Location");
             },
-            error => {
-                console.log("Geolocation blocked or failed.");
-            }
+            () => console.log("Geolocation blocked.")
         );
     }
 }
 
-
-// ================= SEARCH =================
-
 function attachSearchListener() {
-
     const input = document.getElementById("searchInput");
     if (!input) return;
 
     input.addEventListener("keydown", async function (e) {
-
         if (e.key !== "Enter") return;
 
         const query = input.value.trim();
@@ -68,7 +137,7 @@ function attachSearchListener() {
 
         try {
             const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+                `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${query}`
             );
 
             const data = await res.json();
@@ -95,11 +164,7 @@ function attachSearchListener() {
     });
 }
 
-
-// ================= ANALYZE INCIDENT =================
-
 async function analyzeIncident() {
-
     const input = document.getElementById("incidentInput");
     if (!input) return;
 
@@ -107,7 +172,6 @@ async function analyzeIncident() {
     if (!message) return;
 
     try {
-
         const res = await fetch(`${API_BASE_URL}/analyze`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -125,7 +189,6 @@ async function analyzeIncident() {
         }
 
         input.value = "";
-
         fetchIncidents();
 
     } catch (err) {
@@ -133,13 +196,8 @@ async function analyzeIncident() {
     }
 }
 
-
-// ================= FETCH INCIDENTS =================
-
 async function fetchIncidents() {
-
     try {
-
         const res = await fetch(`${API_BASE_URL}/incidents`);
         const incidents = await res.json();
 
@@ -166,13 +224,8 @@ async function fetchIncidents() {
     }
 }
 
-
-// ================= SOS =================
-
 async function triggerSOS() {
-
     try {
-
         await fetch(`${API_BASE_URL}/sos`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -184,28 +237,29 @@ async function triggerSOS() {
             })
         });
 
-        console.log("SOS Sent");
+        alert("SOS Sent Successfully");
 
     } catch (err) {
         console.log("SOS failed", err);
     }
 }
 
-
-// ================= ACTION BUTTONS =================
-
 function deployDrone() {
-    console.log("Drone dispatched to", currentLat, currentLng);
+    alert("Drone dispatched to location");
 }
 
 function requestAid() {
-    console.log("Aid team requested at", currentLat, currentLng);
+    alert("Aid team requested");
 }
 
 function evacuateArea() {
-    console.log("Evacuation initiated");
+    alert("Evacuation initiated");
 }
 
 function lockdownArea() {
-    console.log("Lockdown activated");
+    alert("Lockdown activated");
 }
+</script>
+
+</body>
+</html>
